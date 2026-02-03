@@ -1,0 +1,68 @@
+version: 2.0
+
+accept_license: true
+
+project: geosem
+
+integrations:
+  flutter: true
+
+workflows:
+  ios-build:
+    name: GeoSem iOS Build
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: develop
+          include: true
+      tag_patterns:
+        - pattern: "v*"
+          include: true
+    scripts:
+      - name: Setup Flutter
+        script: |
+          flutter channel stable
+          flutter upgrade
+          flutter doctor
+      - name: Install dependencies
+        script: |
+          flutter pub get
+          cd ios && pod install
+      - name: Build iOS App
+        script: |
+          flutter build ios --release --no-codesign
+      - name: Archive and Export
+        script: |
+          cd ios
+          xcodebuild -workspace Runner.xcworkspace \
+                    -scheme Runner \
+                    -configuration Release \
+                    -archivePath build/Runner.xcarchive \
+                    archive
+          
+          xcodebuild -exportArchive \
+                    -archivePath build/Runner.xcarchive \
+                    -exportOptionsPlist ExportOptions.plist \
+                    -exportPath build/outputs
+    artifacts:
+      - ios/build/outputs/*.ipa
+      - ios/build/Runner.xcarchive/**
+    publishing:
+      email:
+        recipients:
+          - geography@knust.edu.gh
+      scripts:
+        - name: Publish to App Store (if tagged)
+          script: |
+            if [[ $CM_TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Publishing to App Store..."
+              # Add App Store Connect publishing commands here
+            fi
